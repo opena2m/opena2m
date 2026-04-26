@@ -1,0 +1,117 @@
+version: "3.9"
+
+services:
+  # ─── Infrastructure ───────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: opena2m
+      POSTGRES_USER: opena2m
+      POSTGRES_PASSWORD: opena2m_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opena2m"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Application ─────────────────────────────────────────────────────────
+
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      AIMP_DB_URL: postgresql+asyncpg://opena2m:opena2m_dev@postgres:5432/opena2m
+      AIMP_REDIS_URL: redis://redis:6379/0
+      AIMP_OBJECT_STORE_ENDPOINT: http://minio:9000
+      AIMP_OBJECT_STORE_BUCKET: aimp-media
+      AIMP_OBJECT_STORE_ACCESS_KEY: minioadmin
+      AIMP_OBJECT_STORE_SECRET_KEY: minioadmin
+      AIMP_BASE_URL: http://localhost:8080
+      AIMP_DEV: "true"
+      AIMP_DEV_TOKEN: dev-token
+      AIMP_JWT_SECRET: dev-secret-change-in-production
+      AIMP_AUDIT_PRIVATE_KEY_PATH: /app/keys/audit_ed25519.pem
+      CORS_ORIGINS: '["http://localhost:3000","http://localhost:5173"]'
+      PORT: 8080
+    volumes:
+      - gateway_keys:/app/keys
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  console:
+    build:
+      context: ./console
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+  mcp-bridge:
+    build:
+      context: ./mcp-bridge
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      AIMP_GATEWAY_URL: http://gateway:8080
+      AIMP_GATEWAY_TOKEN: dev-token
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  minio_data:
+  gateway_keys:

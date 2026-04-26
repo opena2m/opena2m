@@ -1,0 +1,219 @@
+---
+# Gateway Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opena2m-gateway
+  namespace: opena2m
+  labels:
+    app: opena2m-gateway
+    version: "0.1.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: opena2m-gateway
+  template:
+    metadata:
+      labels:
+        app: opena2m-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: gateway
+          image: opena2m/gateway:0.1.0
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: AIMP_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: opena2m-secrets
+                  key: db-url
+            - name: AIMP_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: opena2m-secrets
+                  key: redis-url
+            - name: AIMP_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: opena2m-secrets
+                  key: jwt-secret
+            - name: AIMP_OBJECT_STORE_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: opena2m-config
+                  key: object-store-endpoint
+            - name: AIMP_OBJECT_STORE_BUCKET
+              value: "aimp-media"
+            - name: AIMP_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: opena2m-config
+                  key: base-url
+            - name: AIMP_DEV
+              value: "false"
+            - name: AIMP_AUDIT_PRIVATE_KEY_PATH
+              value: "/secrets/audit_ed25519.pem"
+          volumeMounts:
+            - name: audit-key
+              mountPath: /secrets
+              readOnly: true
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: audit-key
+          secret:
+            secretName: opena2m-audit-key
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opena2m-gateway
+  namespace: opena2m
+spec:
+  selector:
+    app: opena2m-gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+
+---
+# Console Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opena2m-console
+  namespace: opena2m
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opena2m-console
+  template:
+    metadata:
+      labels:
+        app: opena2m-console
+    spec:
+      containers:
+        - name: console
+          image: opena2m/console:0.1.0
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opena2m-console
+  namespace: opena2m
+spec:
+  selector:
+    app: opena2m-console
+  ports:
+    - port: 3000
+      targetPort: 3000
+
+---
+# MCP Bridge Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opena2m-mcp-bridge
+  namespace: opena2m
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opena2m-mcp-bridge
+  template:
+    metadata:
+      labels:
+        app: opena2m-mcp-bridge
+    spec:
+      containers:
+        - name: mcp-bridge
+          image: opena2m/mcp-bridge:0.1.0
+          env:
+            - name: AIMP_GATEWAY_URL
+              value: "http://opena2m-gateway:8080"
+            - name: AIMP_GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: opena2m-secrets
+                  key: mcp-bridge-token
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opena2m
+
+---
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: opena2m
+  namespace: opena2m
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  rules:
+    - host: gateway.opena2m.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: opena2m-gateway
+                port:
+                  number: 8080
+    - host: console.opena2m.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: opena2m-console
+                port:
+                  number: 3000
