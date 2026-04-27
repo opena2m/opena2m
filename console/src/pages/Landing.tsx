@@ -34,7 +34,7 @@ export default function Landing() {
           </div>
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-            {[[t.landing.docs,'https://docs.aimp.dev'],['Spec','https://github.com/your-org/opena2m/blob/main/WHITEPAPER.md'],[t.landing.github,'https://github.com/your-org/opena2m']].map(([l,h])=><a key={l} href={h} style={{color:'var(--c-dim)',textDecoration:'none',fontSize:13}}>{l}</a>)}
+            {[[t.landing.docs,'https://aimp.infoecos.ai/dJrBIhbsA3Dj1d6gFgTi'],['Spec','https://github.com/opena2m/publish-docs/blob/main/README.md'],[t.landing.github,'https://github.com/opena2m/opena2m']].map(([l,h])=><a key={l} href={h} style={{color:'var(--c-dim)',textDecoration:'none',fontSize:13}}>{l}</a>)}
             <span style={{ background: 'var(--c-accent-glow)', color: 'var(--c-accent)', padding: '2px 8px', borderRadius: 4, fontSize: 10, border: '1px solid var(--c-accent)', fontWeight: 600 }}>AIMP 1.0.0-draft</span>
           </div>
           <button onClick={enter} style={{ background: 'var(--c-accent)', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>Open Console →</button>
@@ -62,10 +62,10 @@ export default function Landing() {
             <button onClick={enter} style={{ background: 'var(--c-accent)', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 28px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
               Try the Console Demo →
             </button>
-            <a href="https://github.com/your-org/opena2m/blob/main/WHITEPAPER.md" target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', background: 'var(--c-surface)', color: 'var(--c-text)', border: '1px solid var(--c-border)', borderRadius: 8, padding: '12px 28px', fontSize: 14, fontWeight: 600, textDecoration: 'none', fontFamily: 'var(--font-mono)' }}>
+            <a href="https://github.com/opena2m/publish-docs/blob/main/WHITEPAPER.md" target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', background: 'var(--c-surface)', color: 'var(--c-text)', border: '1px solid var(--c-border)', borderRadius: 8, padding: '12px 28px', fontSize: 14, fontWeight: 600, textDecoration: 'none', fontFamily: 'var(--font-mono)' }}>
               Read the Whitepaper
             </a>
-            <a href="https://github.com/your-org/opena2m" target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', background: 'transparent', color: 'var(--c-dim)', border: '1px solid var(--c-border)', borderRadius: 8, padding: '12px 28px', fontSize: 14, fontWeight: 600, textDecoration: 'none', fontFamily: 'var(--font-mono)' }}>
+            <a href="https://github.com/opena2m/opena2m" target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', background: 'transparent', color: 'var(--c-dim)', border: '1px solid var(--c-border)', borderRadius: 8, padding: '12px 28px', fontSize: 14, fontWeight: 600, textDecoration: 'none', fontFamily: 'var(--font-mono)' }}>
               View on GitHub
             </a>
           </div>
@@ -143,7 +143,7 @@ export default function Landing() {
       <Section title={t.landing.quickstartTitle} sub={t.landing.quickstartSub} center>
         <div style={{ background: 'var(--c-panel)', border: '1px solid var(--c-border)', borderRadius: 10, padding: '20px 24px', fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 2.1, maxWidth: 560, margin: '0 auto' }}>
           <div style={{ color: 'var(--c-dim)' }}># clone and start</div>
-          <div><span style={{ color: 'var(--c-accent)' }}>git clone</span> <span style={{ color: 'var(--c-dim)' }}>https://github.com/your-org/opena2m.git</span></div>
+          <div><span style={{ color: 'var(--c-accent)' }}>git clone</span> <span style={{ color: 'var(--c-dim)' }}>https://github.com/opena2m/opena2m.git</span></div>
           <div><span style={{ color: 'var(--c-accent)' }}>make dev-up</span>     <span style={{ color: 'var(--c-dim)' }}># postgres + redis + minio + gateway + console</span></div>
           <div><span style={{ color: 'var(--c-accent)' }}>make seed</span>       <span style={{ color: 'var(--c-dim)' }}># register cloudprint-sim-1 + fdm-sim-1</span></div>
           <div />
@@ -162,7 +162,7 @@ export default function Landing() {
         <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ fontSize: 11, color: 'var(--c-dim)' }}>OpenA2M v0.1.0 · Apache-2.0 · Targeting AIMP 1.0.0-draft</div>
           <div style={{ display: 'flex', gap: 20 }}>
-            {[[t.landing.docs,'https://docs.aimp.dev'],['Spec','https://github.com/your-org/opena2m/blob/main/WHITEPAPER.md'],[t.landing.github,'https://github.com/your-org/opena2m'],['Whitepaper','https://github.com/your-org/opena2m/blob/main/WHITEPAPER.md']].map(([l,h])=><a key={l} href={h} target="_blank" rel="noreferrer" style={{color:'var(--c-dim)',textDecoration:'none',fontSize:11}}>{l}</a>)}
+            {[[t.landing.docs,'https://aimp.infoecos.ai/dJrBIhbsA3Dj1d6gFgTi'],['Spec','https://github.com/opena2m/publish-docs/blob/main/README.md'],[t.landing.github,'https://github.com/opena2m/opena2m'],['Whitepaper','https://github.com/opena2m/publish-docs/blob/main/WHITEPAPER.md']].map(([l,h])=><a key={l} href={h} target="_blank" rel="noreferrer" style={{color:'var(--c-dim)',textDecoration:'none',fontSize:11}}>{l}</a>)}
           </div>
         </div>
       </footer>
