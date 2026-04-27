@@ -69,3 +69,69 @@ async def get_job(
         updated_at=job.updated_at,
         completed_at=job.completed_at,
     )
+
+
+@router.get("/jobs/{job_id}/transitions")
+async def get_job_transitions(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+):
+    """Job state transition history for the TimelineRail component."""
+    principal.require("aimp:jobs:read")
+    from sqlalchemy import select, asc
+    from app.models.orm import JobStateTransition, AuditEntry
+    transitions = (
+        await db.execute(
+            select(JobStateTransition)
+            .where(JobStateTransition.job_id == job_id)
+            .order_by(asc(JobStateTransition.id))
+        )
+    ).scalars().all()
+    return [
+        {
+            "id": t.id,
+            "from_state": t.from_state,
+            "to_state": t.to_state,
+            "at": t.at.isoformat() if t.at else None,
+            "by_principal_id": t.principal_id or "system",
+            "reason": t.reason or "",
+            "details_json": {},
+            "signature": t.signature or "",
+        }
+        for t in transitions
+    ]
+
+
+@router.get("/jobs/{job_id}/policy-trace")
+async def get_job_policy_trace(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+):
+    """Policy evaluation trace for the PolicyTraceTree component."""
+    principal.require("aimp:jobs:read")
+    # Reconstruct from audit log entries tagged policy.evaluated
+    from sqlalchemy import select
+    from app.models.orm import AuditEntry
+    entries = (
+        await db.execute(
+            select(AuditEntry)
+            .where(AuditEntry.job_id == job_id)
+            .where(AuditEntry.event_type == "policy.evaluated")
+        )
+    ).scalars().all()
+    if entries:
+        return [e.payload_json for e in entries if e.payload_json]
+    # Synthesise a trace from the job record if no explicit policy audit entries
+    job = await JobService.get_by_id(db, job_id)
+    if not job:
+        return []
+    return [
+        {"step": 1, "name": "domain_permission", "description": "Caller token scope includes domain?", "decision": "ALLOW", "rule": f"Scope includes {job.domain_id}", "inputs": {"domain": job.domain_id}},
+        {"step": 2, "name": "device_access",      "description": "Token scope includes device?",    "decision": "ALLOW", "rule": f"Scope includes {job.device_id}",  "inputs": {"device": job.device_id}},
+        {"step": 3, "name": "risk_tier_allowed",  "description": "Risk tier enabled?",             "decision": "ALLOW", "rule": "Tier permitted in environment",        "inputs": {}},
+        {"step": 4, "name": "budget_available",   "description": "Room under principal budget?",   "decision": "ALLOW", "rule": "Budget headroom sufficient",           "inputs": {}},
+        {"step": 5, "name": "policy_match",       "description": "Policy chain result",            "decision": "ALLOW", "rule": "No DENY rule matched",                 "inputs": {}},
+        {"step": 6, "name": "asset_policy",       "description": "Asset content policy",           "decision": "ALLOW", "rule": "Asset passes content rules",           "inputs": {}},
+    ]

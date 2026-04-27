@@ -2,43 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap');
+
 @layer base {
   :root {
-    --sidebar-width: 220px;
-    --topbar-height: 56px;
+    --font-mono: 'JetBrains Mono','Cascadia Code',monospace;
+    --font-display: 'Syne',system-ui,sans-serif;
+    --c-bg:#080c14;--c-surface:#0d1320;--c-panel:#111827;
+    --c-border:#1f2a3d;--c-border-dim:#162032;
+    --c-text:#ccd6f6;--c-dim:#647193;
+    --c-accent:#4f8ef7;--c-accent-glow:rgba(79,142,247,0.14);
+    --c-green:#34d399;--c-amber:#fbbf24;--c-red:#f87171;--c-violet:#a78bfa;
   }
-  * { box-sizing: border-box; }
-  body { font-family: 'Inter', system-ui, sans-serif; }
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2e3a50; border-radius: 3px; }
+  *{box-sizing:border-box;}
+  html{font-family:var(--font-mono);background:var(--c-bg);}
+  body{color:var(--c-text);font-size:13px;line-height:1.6;-webkit-font-smoothing:antialiased;}
+  ::-webkit-scrollbar{width:4px;height:4px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:#1f2a3d;border-radius:2px;}
+  ::selection{background:var(--c-accent-glow);color:#fff;}
 }
 
 @layer components {
-  .card {
-    @apply bg-surface-800 border border-surface-600 rounded-xl p-5;
+  .card{background:var(--c-panel);border:1px solid var(--c-border);border-radius:10px;padding:16px 20px;transition:border-color .2s;}
+  .card-hover:hover{border-color:var(--c-accent);}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:6px;font-family:var(--font-mono);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;border:1px solid transparent;white-space:nowrap;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .btn-primary{background:var(--c-accent);color:#fff;border-color:var(--c-accent);}
+  .btn-primary:hover:not(:disabled){background:#3a7ee8;}
+  .btn-ghost{background:transparent;color:var(--c-dim);border-color:var(--c-border);}
+  .btn-ghost:hover:not(:disabled){color:var(--c-text);border-color:#2d3d57;background:var(--c-surface);}
+  .btn-danger{background:#7f1d1d;color:var(--c-red);border-color:#991b1b;}
+  .btn-danger:hover:not(:disabled){background:#991b1b;}
+  .btn-amber{background:#451a03;color:var(--c-amber);border-color:#92400e;}
+  .btn-amber:hover:not(:disabled){background:#78350f;}
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px;font-weight:500;letter-spacing:.03em;white-space:nowrap;}
+  .input{width:100%;background:var(--c-surface);border:1px solid var(--c-border);border-radius:6px;padding:7px 11px;color:var(--c-text);font-family:var(--font-mono);font-size:12px;outline:none;transition:border-color .15s;}
+  .input:focus{border-color:var(--c-accent);box-shadow:0 0 0 2px var(--c-accent-glow);}
+  .input::placeholder{color:var(--c-dim);}
+  select.input{cursor:pointer;}
+  textarea.input{resize:vertical;min-height:64px;}
+  .table-th{color:var(--c-dim);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:10px 16px;text-align:left;border-bottom:1px solid var(--c-border);white-space:nowrap;}
+  .table-td{padding:10px 16px;border-bottom:1px solid var(--c-border-dim);vertical-align:middle;}
+  .table-row{transition:background .1s;}
+  .table-row:hover{background:rgba(79,142,247,0.04);}
+  .table-row:last-child .table-td{border-bottom:none;}
+  .progress-track{height:4px;border-radius:2px;background:var(--c-border);overflow:hidden;flex-shrink:0;}
+  .progress-fill{height:100%;border-radius:2px;transition:width .3s;}
+  .section-title{font-family:var(--font-display);font-size:17px;font-weight:700;color:var(--c-text);letter-spacing:-.01em;}
+  .section-sub{font-size:12px;color:var(--c-dim);margin-top:2px;}
+  .tab{padding:8px 16px;font-size:12px;font-weight:500;border-bottom:2px solid transparent;color:var(--c-dim);cursor:pointer;transition:all .15s;white-space:nowrap;}
+  .tab:hover{color:var(--c-text);}
+  .tab.active{border-bottom-color:var(--c-accent);color:var(--c-accent);}
+  .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:40;backdrop-filter:blur(2px);}
+}
+
+@layer utilities {
+  .text-accent{color:var(--c-accent);}
+  .text-green{color:var(--c-green);}
+  .text-amber{color:var(--c-amber);}
+  .text-red{color:var(--c-red);}
+  .text-dim{color:var(--c-dim);}
+  .bg-panel{background:var(--c-panel);}
+  .bg-surface{background:var(--c-surface);}
+  .bg-base{background:var(--c-bg);}
+  @keyframes pulse-dot{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .animate-pulse-dot{animation:pulse-dot 1.8s ease-in-out infinite;}
+  @keyframes fade-in{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:translateY(0);}}
+  .animate-fade-in{animation:fade-in .22s ease both;}
+  @media(max-width:767px){
+    .sidebar-overlay.open{display:block;}
+    .mobile-hidden{display:none!important;}
   }
-  .btn-primary {
-    @apply bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg
-           text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-  .btn-ghost {
-    @apply hover:bg-surface-700 text-slate-300 hover:text-white px-3 py-2 rounded-lg
-           text-sm transition-colors;
-  }
-  .btn-danger {
-    @apply bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg
-           text-sm font-medium transition-colors;
-  }
-  .badge {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
-  }
-  .input {
-    @apply bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm
-           text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2
-           focus:ring-brand-500 focus:border-transparent w-full;
-  }
-  .table-header {
-    @apply text-xs font-semibold text-slate-400 uppercase tracking-wider;
+  @media(min-width:768px){
+    .desktop-hidden{display:none!important;}
   }
 }

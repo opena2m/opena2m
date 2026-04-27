@@ -102,3 +102,51 @@ async def dry_run(
         "policy_id": verdict.policy_id,
         "policy_name": verdict.policy_name,
     }
+
+
+@router.get("/policies/{policy_id}")
+async def get_policy(
+    policy_id: str,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+):
+    """Policy detail for PolicyDetail editor page."""
+    principal.require("aimp:policies:read")
+    from sqlalchemy import select
+    from app.models.orm import Policy
+    # Check built-in policies first
+    builtin_map = {
+        "builtin-deny-hazardous": {
+            "policy_id": "builtin-deny-hazardous", "name": "Deny hazardous (built-in)",
+            "enabled": True, "priority": 10, "matches_today": 0, "version": 1,
+            "updated_at": None, "updated_by": "system",
+            "rules_yaml": "id: builtin-deny-hazardous\ndecision: DENY\nwhen:\n  risk_tier: hazardous",
+        },
+        "builtin-hitl-restricted": {
+            "policy_id": "builtin-hitl-restricted", "name": "HITL for restricted (built-in)",
+            "enabled": True, "priority": 20, "matches_today": 0, "version": 1,
+            "updated_at": None, "updated_by": "system",
+            "rules_yaml": "id: builtin-hitl-restricted\ndecision: REQUIRE_APPROVAL\nwhen:\n  risk_tier: restricted",
+        },
+    }
+    if policy_id in builtin_map:
+        return builtin_map[policy_id]
+    policy = await db.get(Policy, policy_id)
+    if policy is None:
+        raise HTTPException(status_code=404, detail="Policy not found.")
+    import yaml
+    rules_yaml = f"id: {policy.policy_id}\nenabled: {str(policy.enabled).lower()}\n"
+    rules_yaml += yaml.dump(policy.rule_json, default_flow_style=False) if policy.rule_json else ""
+    return {
+        "policy_id": policy.policy_id,
+        "name": policy.name,
+        "description": policy.description,
+        "enabled": policy.enabled,
+        "priority": policy.priority,
+        "matches_today": 0,
+        "version": 1,
+        "updated_at": policy.updated_at.isoformat() if policy.updated_at else None,
+        "updated_by": "system",
+        "rules_yaml": rules_yaml,
+        "rule": policy.rule_json,
+    }

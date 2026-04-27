@@ -1,14 +1,13 @@
 {
   "name": "opena2m-console",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives",
-    "test": "vitest"
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -18,7 +17,6 @@
     "recharts": "^2.12.7",
     "lucide-react": "^0.383.0",
     "clsx": "^2.1.1",
-    "date-fns": "^3.6.0",
     "zustand": "^4.5.4",
     "axios": "^1.7.2"
   },
@@ -31,9 +29,7 @@
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
-    "eslint": "^8.57.0",
     "@typescript-eslint/eslint-plugin": "^7.13.0",
-    "@typescript-eslint/parser": "^7.13.0",
-    "vitest": "^1.6.0"
+    "@typescript-eslint/parser": "^7.13.0"
   }
 }

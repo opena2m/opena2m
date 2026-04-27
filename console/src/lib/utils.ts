@@ -58,3 +58,7 @@ export function truncate(s: string, n = 12): string {
 export function pct(v: number): string {
   return `${(v * 100).toFixed(0)}%`
 }
+
+export const fmtAgo = (iso:string) => { const s=Math.floor((Date.now()-new Date(iso).getTime())/1000); if(s<60) return `${s}s ago`; if(s<3600) return `${Math.floor(s/60)}m ago`; if(s<86400) return `${Math.floor(s/3600)}h ago`; return `${Math.floor(s/86400)}d ago` }
+export const fmtUSD = (n:number) => `$${n.toFixed(2)}`
+export const truncId = (id:string, n=12) => id.length>n ? id.slice(0,n)+'…' : id

@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom'
+import { useT } from '@/i18n'
 
 export default function NotFound() {
+  const t = useT()
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-      <p className="text-6xl font-bold text-slate-700 mb-4">404</p>
-      <h1 className="text-2xl font-bold text-white mb-2">Page not found</h1>
-      <p className="text-slate-400 mb-6">The page you're looking for doesn't exist.</p>
-      <Link to="/dashboard" className="btn-primary">Back to Dashboard</Link>
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center gap-4">
+      <p className="text-[80px] font-bold text-[var(--c-border)] leading-none" style={{fontFamily:'var(--font-display)'}}>404</p>
+      <h1 className="text-xl font-bold text-[var(--c-text)]">{t.notFound.title}</h1>
+      <p className="text-[var(--c-dim)] text-sm">{t.notFound.desc}</p>
+      <Link to="/dashboard" className="btn btn-primary mt-2">{t.notFound.back}</Link>
     </div>
   )
 }

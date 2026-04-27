@@ -119,3 +119,53 @@ async def disable_device(
         raise HTTPException(status_code=404, detail="Device not found.")
     device.disabled_at = datetime.now(timezone.utc)
     return {"device_id": device_id, "disabled": True}
+
+
+@router.post("/devices/{device_id}/restart")
+async def restart_device_adapter(
+    device_id: str,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+):
+    """Restart the adapter for a device. Logged to audit trail."""
+    principal.require("aimp:devices:write")
+    from app.models.orm import Device as DeviceModel
+    device = await db.get(DeviceModel, device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found.")
+    from app.core.audit import AuditLog
+    from app.services.adapter_registry import AdapterRegistry
+    registry = AdapterRegistry()
+    await registry.reload_adapter(device_id)
+    await AuditLog.write(
+        db=db, event_type="device.restart",
+        payload={"device_id": device_id, "requested_by": principal.principal_id},
+        principal_id=principal.principal_id, job_id=None,
+    )
+    return {"device_id": device_id, "restarting": True}
+
+
+@router.post("/devices/{device_id}/toggle")
+async def toggle_device(
+    device_id: str,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+):
+    """Enable or disable a device adapter. Logged to audit trail."""
+    principal.require("aimp:devices:write")
+    from sqlalchemy import select
+    from app.models.orm import Device as DeviceModel
+    from datetime import datetime, timezone
+    device = await db.get(DeviceModel, device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found.")
+    now_disabled = device.disabled_at is not None
+    device.disabled_at = None if now_disabled else datetime.now(timezone.utc)
+    await db.commit()
+    from app.core.audit import AuditLog
+    await AuditLog.write(
+        db=db, event_type="device.toggle",
+        payload={"device_id": device_id, "now_enabled": now_disabled},
+        principal_id=principal.principal_id, job_id=None,
+    )
+    return {"device_id": device_id, "now_enabled": now_disabled}

@@ -48,3 +48,43 @@ async def create_budget(
         period=body.period,
     )
     return {"budget_id": budget.budget_id, "name": budget.name}
+
+
+@router.get("/budgets/{budget_id}")
+async def get_budget(
+    budget_id: str,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+):
+    """Budget detail with contributing jobs (for BudgetDetail page)."""
+    principal.require("aimp:budgets:read")
+    from sqlalchemy import select
+    from app.models.orm import Budget as BudgetModel, Job
+    b = await db.get(BudgetModel, budget_id)
+    if b is None:
+        raise HTTPException(status_code=404, detail="Budget not found.")
+    # Contributing jobs
+    jobs = (
+        await db.execute(
+            select(Job)
+            .where(Job.principal_id == b.principal_id)
+            .order_by(Job.created_at.desc())
+            .limit(10)
+        )
+    ).scalars().all()
+    return {
+        "budget_id": b.budget_id,
+        "principal_id": b.principal_id,
+        "scope_domain_id": None,
+        "ceiling_amount": b.ceiling,
+        "ceiling_currency": b.currency,
+        "window_kind": b.period or "total",
+        "warn_at_percent": int(b.warn_threshold * 100),
+        "hard_deny": True,
+        "consumed": b.consumed,
+        "utilization": b.consumed / b.ceiling if b.ceiling > 0 else 0,
+        "window_starts_at": b.period_start.isoformat() if b.period_start else None,
+        "window_resets_at": None,
+        "history": [],
+        "jobs": [{"job_id": j.job_id, "state": j.state, "cost_estimate": j.request_json.get("cost") if j.request_json else None} for j in jobs],
+    }
