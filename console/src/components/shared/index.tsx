@@ -119,6 +119,26 @@ export function LangSwitcher() {
   </button>
 }
 
+
+// ── Theme switcher ─────────────────────────────────────────────────────────────
+export function ThemeSwitcher() {
+  const { theme, toggleTheme } = useSettingsStore()
+  const t = useT()
+  const isDark = theme === 'dark'
+  return (
+    <button
+      onClick={toggleTheme}
+      className="flex items-center justify-center w-7 h-7 rounded-md text-[var(--c-dim)] hover:text-[var(--c-text)] hover:bg-[var(--c-surface)] transition-all border border-[var(--c-border)]"
+      title={isDark ? t.theme.switchToLight : t.theme.switchToDark}
+      aria-label={isDark ? t.theme.switchToLight : t.theme.switchToDark}
+    >
+      <span className="text-sm leading-none animate-theme-spin" key={theme}>
+        {isDark ? '☀' : '🌙'}
+      </span>
+    </button>
+  )
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 export const pct = (v:number) => `${(v*100).toFixed(0)}%`
 export function RelativeTime({ iso }: { iso:string }) {

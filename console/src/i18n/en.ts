@@ -224,6 +224,12 @@ export const en = {
     back: 'Back', viewJob: 'View job',
     jobCreated: 'Job started!', jobCreatedDesc: 'The job has been submitted and is transitioning to EXECUTING.',
   },
+
+  theme: {
+    label: 'Theme', dark: 'Dark', light: 'Light',
+    switchToDark: 'Switch to dark mode', switchToLight: 'Switch to light mode',
+    current: 'Current theme',
+  },
 }
 
 export type Translations = typeof en

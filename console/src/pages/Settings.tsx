@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Globe, Activity, Key, Webhook, Users, Settings as SettingsIcon, Lock } from 'lucide-react'
+import { Globe, Activity, Key, Webhook, Users, Settings as SettingsIcon, Lock, Sun, Moon } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useT } from '@/i18n'
 import { useSettingsStore } from '@/store/settings'
 import { getCapabilities, listWebhooks, listSigningKeys, listUsers, createWebhook, deleteWebhook, createUser } from '@/lib/dataLayer'
-import { ModeSwitcher, LangSwitcher, ApprovalConfirmModal, SimpleModal } from '@/components/shared'
+import { ModeSwitcher, LangSwitcher, ThemeSwitcher, ApprovalConfirmModal, SimpleModal } from '@/components/shared'
 import { useToastStore } from '@/store/toast'
 import type { Lang } from '@/i18n'
 import { translations } from '@/i18n'
@@ -23,7 +23,7 @@ function Section({ icon: Icon, title, children }: { icon: any; title: string; ch
 }
 
 export default function Settings() {
-  const t = useT(); const { lang, setLang, mode } = useSettingsStore()
+  const t = useT(); const { lang, setLang, mode, theme, setTheme } = useSettingsStore()
   const m = mode
   const qc = useQueryClient()
   const addToast = useToastStore(s => s.addToast)
@@ -106,6 +106,24 @@ export default function Settings() {
               <p className="text-xs text-[var(--c-dim)] flex-1">{t.settings.mockModeDesc}</p>
             </div>
           </Section>
+
+          <Section icon={theme === 'dark' ? Moon : Sun} title={t.theme.label}>
+            <div className="flex items-center gap-3">
+              <div className="flex gap-2">
+                {(['dark', 'light'] as const).map(th => (
+                  <button key={th} onClick={() => setTheme(th)}
+                    className={clsx('btn flex items-center gap-2', theme === th ? 'btn-primary' : 'btn-ghost')}>
+                    <span className="text-sm">{th === 'dark' ? '🌙' : '☀️'}</span>
+                    {t.theme[th]}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-[var(--c-dim)]">
+                {t.theme.current}: <span className="text-[var(--c-text)] mono">{theme}</span>
+              </p>
+            </div>
+          </Section>
+
           <Section icon={Activity} title={t.settings.gateway}>
             {caps ? (
               <div className="space-y-4">

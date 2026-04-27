@@ -1,10 +1,12 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useSettingsStore } from '@/store/settings'
 import { useT } from '@/i18n'
 
 export default function Landing() {
   const navigate = useNavigate()
   const t = useT()
+  const isDark = useSettingsStore(s => s.theme) === 'dark'
   const enter = () => navigate('/dashboard')
 
   const VERBS = [
@@ -117,7 +119,7 @@ export default function Landing() {
               <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, color: 'var(--c-text)' }}>{s.title}</div>
               <p style={{ fontSize: 12, color: 'var(--c-dim)', lineHeight: 1.7, marginBottom: 12 }}>{s.desc}</p>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {s.tags.map(tag => <span key={tag} style={{ background: `${s.color}22`, color: `${s.color === '#1d4ed8' ? '#93c5fd' : '#fcd34d'}`, border: `1px solid ${s.border}`, borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 600 }}>{tag}</span>)}
+                {s.tags.map(tag => <span key={tag} style={{ background: `${s.color}22`, color: isDark ? (s.color === '#1d4ed8' || s.color === '#2563eb' ? '#93c5fd' : '#fcd34d') : (s.color === '#2563eb' || s.color === '#1d4ed8' ? '#1e40af' : '#92400e'), border: `1px solid ${s.border}`, borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 600 }}>{tag}</span>)}
               </div>
             </div>
           ))}

@@ -6,6 +6,19 @@ import App from './App'
 import { I18nProvider } from './i18n'
 import './index.css'
 
+// Apply persisted theme before first render to avoid flash
+const stored = localStorage.getItem('opena2m-settings')
+if (stored) {
+  try {
+    const { state } = JSON.parse(stored)
+    if (state?.theme) document.documentElement.setAttribute('data-theme', state.theme)
+  } catch { /* ignore */ }
+}
+// Default to dark if nothing stored
+if (!document.documentElement.getAttribute('data-theme')) {
+  document.documentElement.setAttribute('data-theme', 'dark')
+}
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 8_000, retry: 1 } },
 })

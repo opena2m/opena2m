@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { clsx } from 'clsx'
 import { LayoutDashboard, Briefcase, ShieldAlert, Monitor, Package, FileText, DollarSign, ScrollText, Settings, Menu, X, Cpu, Activity, Search } from 'lucide-react'
-import { ModeSwitcher, LangSwitcher } from '@/components/shared'
+import { ModeSwitcher, LangSwitcher, ThemeSwitcher } from '@/components/shared'
 import { useT } from '@/i18n'
 import { listJobs, getHealth } from '@/lib/dataLayer'
 import { useSettingsStore } from '@/store/settings'
@@ -82,6 +82,7 @@ export default function Layout() {
         <div className="px-3 py-3 border-t border-[var(--c-border-dim)] space-y-2">
           <ModeSwitcher />
           <div className="flex items-center justify-between px-1">
+            <ThemeSwitcher />
             <span className="text-[10px] text-[var(--c-dim)] opacity-60">AIMP 1.0-draft · L3</span>
             <LangSwitcher />
           </div>
@@ -131,6 +132,7 @@ export default function Layout() {
             </button>
           )}
 
+          <ThemeSwitcher />
           {/* Back to landing */}
           <button className="btn btn-ghost text-xs hidden md:flex" onClick={() => navigate('/')}>← Landing</button>
         </header>

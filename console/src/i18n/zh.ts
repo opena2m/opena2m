@@ -225,4 +225,10 @@ export const zh: Translations = {
     back: '返回', viewJob: '查看任务',
     jobCreated: '任务已启动！', jobCreatedDesc: '任务已提交，正在转换到 EXECUTING 状态。',
   },
+
+  theme: {
+    label: '主题', dark: '深色', light: '浅色',
+    switchToDark: '切换到深色模式', switchToLight: '切换到浅色模式',
+    current: '当前主题',
+  },
 }
