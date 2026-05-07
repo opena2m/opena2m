@@ -3,7 +3,7 @@ id: INFRA-001
 title: Repo, CI, Docker Compose & Seed
 component: Infrastructure
 week: W1-W2
-status: pending
+status: in-progress
 priority: P1
 hours: 24
 depends_on: []
@@ -19,42 +19,42 @@ This task establishes the full local development environment and CI pipeline tha
 **Decide on Day 1:** The Makefile is the single developer interface — all CI commands must be wrappers around Makefile targets. Do not expose raw docker / pytest / npm commands in CI; CI calls `make test`, `make lint`, etc.
 
 ## Prerequisites
-- [ ] Empty repository created and pushed to GitHub
-- [ ] Local Docker with Compose v2 available
+- [x] Empty repository created and pushed to GitHub
+- [x] Local Docker with Compose v2 available
 
 ## Tasks
 
 ### Group 01 — Repo Scaffold (4h)
-- [ ] **[P1]** Create root `Makefile` with targets: `dev-up`, `dev-down`, `dev-logs`, `dev-ps`, `seed`, `gateway-install`, `gateway-dev`, `gateway-install`, `console-install`, `console-dev`, `test`, `test-gateway`, `test-e2e`, `lint`, `lint-gateway`, `lint-console`, `clean` `Makefile` (2h)
-- [ ] **[P1]** Create `deploy/docker-compose.yml` with services: `postgres:16-alpine`, `redis:7-alpine`, `minio/minio`, `gateway` (build: ./gateway), `console` (build: ./console), `mcp-bridge` (build: ./mcp-bridge); set correct `depends_on` and health checks (1.5h)
-- [ ] **[P2]** Create `.env.example` at repo root with all required env vars from CONVENTIONS.md; create `.gitignore` covering Python, Node, Docker, IDE, `.env` (0.5h)
+- [x] **[P1]** Create root `Makefile` with targets: `dev-up`, `dev-down`, `dev-logs`, `dev-ps`, `seed`, `gateway-install`, `gateway-dev`, `gateway-install`, `console-install`, `console-dev`, `test`, `test-gateway`, `test-e2e`, `lint`, `lint-gateway`, `lint-console`, `clean` `Makefile` (2h)
+- [x] **[P1]** Create `deploy/docker-compose.yml` with services: `postgres:16-alpine`, `redis:7-alpine`, `minio/minio`, `gateway` (build: ./gateway), `console` (build: ./console), `mcp-bridge` (build: ./mcp-bridge); set correct `depends_on` and health checks (1.5h)
+- [x] **[P2]** Create `.env.example` at repo root with all required env vars from CONVENTIONS.md; create `.gitignore` covering Python, Node, Docker, IDE, `.env` (0.5h)
 
 ### Group 02 — Gateway & Console Skeletons (6h)
-- [ ] **[P1]** Create `gateway/` Python project: `requirements.txt`, `pytest.ini` (`asyncio_mode=auto`, `log_cli=true`), `gateway/app/__init__.py`, minimal `gateway/app/main.py` (FastAPI app with `/healthz` and `/readyz` returning 200), `Dockerfile` (python:3.12-slim, uvicorn entrypoint) (2h)
-- [ ] **[P1]** Create `console/` Vite+React project: `npm create vite@latest` with React+TypeScript template; configure `vite.config.ts` to proxy `/v1`, `/health`, `/capabilities` to `localhost:8080`; add `tailwind.config.js`, `postcss.config.js`, placeholder `App.tsx` (2h)
-- [ ] **[P1]** Create `adapter-sdk/` package stub: `aimp_sdk/__init__.py`, placeholder `base.py`, `setup.py` with entry-point group `aimp.adapters` declared, `tests/` directory with placeholder test (1h)
-- [ ] **[P2]** Create `mcp-bridge/` stub: `server.py` (empty FastAPI app), `requirements.txt`, `Dockerfile` (1h)
+- [x] **[P1]** Create `gateway/` Python project: `requirements.txt`, `pytest.ini` (`asyncio_mode=auto`, `log_cli=true`), `gateway/app/__init__.py`, minimal `gateway/app/main.py` (FastAPI app with `/healthz` and `/readyz` returning 200), `Dockerfile` (python:3.12-slim, uvicorn entrypoint) (2h)
+- [x] **[P1]** Create `console/` Vite+React project: `npm create vite@latest` with React+TypeScript template; configure `vite.config.ts` to proxy `/v1`, `/health`, `/capabilities` to `localhost:8080`; add `tailwind.config.js`, `postcss.config.js`, placeholder `App.tsx` (2h)
+- [x] **[P1]** Create `adapter-sdk/` package stub: `aimp_sdk/__init__.py`, placeholder `base.py`, `setup.py` with entry-point group `aimp.adapters` declared, `tests/` directory with placeholder test (1h)
+- [x] **[P2]** Create `mcp-bridge/` stub: `server.py` (empty FastAPI app), `requirements.txt`, `Dockerfile` (1h)
 
 ### Group 03 — CI Pipeline (6h)
-- [ ] **[P1]** Create `.github/workflows/ci.yml`: on push/PR to `main`; jobs: `lint-gateway` (`make lint-gateway`), `lint-console` (`make lint-console`), `test-gateway` (`make test-gateway`), `test-e2e` (bring up Docker Compose, run `make test-e2e`), `validate-schemas` (run schema golden vector validation against `docs/aimp/examples/`) (3h)
-- [ ] **[P1]** Add `scripts/validate_schemas.py`: iterate `docs/aimp/examples/*.json`, validate each against the relevant schema in `docs/aimp/schemas/`; exit non-zero on failure (1h)
-- [ ] **[P2]** Configure GitHub Actions caching for pip, npm, and Docker layer cache to keep CI under 8 minutes (1h)
-- [ ] **[P2]** Add PR template (`.github/pull_request_template.md`) with CI checklist (0.5h)
-- [ ] **[P3]** Add Dependabot config for Python and npm (0.5h)
+- [ ] **[P1]** Create `.github/workflows/ci.yml`: on push/PR to `main`; jobs: `lint-gateway` (`make lint-gateway`), `lint-console` (`make lint-console`), `test-gateway` (`make test-gateway`), `test-e2e` (bring up Docker Compose, run `make test-e2e`), `validate-schemas` (run schema golden vector validation against `docs/aimp/examples/`) (3h) ← **NOT DONE**
+- [ ] **[P1]** Add `scripts/validate_schemas.py`: iterate `docs/aimp/examples/*.json`, validate each against the relevant schema in `docs/aimp/schemas/`; exit non-zero on failure (1h) ← **NOT DONE**
+- [ ] **[P2]** Configure GitHub Actions caching for pip, npm, and Docker layer cache to keep CI under 8 minutes (1h) ← **NOT DONE**
+- [ ] **[P2]** Add PR template (`.github/pull_request_template.md`) with CI checklist (0.5h) ← **NOT DONE**
+- [ ] **[P3]** Add Dependabot config for Python and npm (0.5h) ← **NOT DONE**
 
 ### Group 04 — Seed Script (4h)
-- [ ] **[P1]** Create `scripts/seed.py`: idempotent script that uses the Gateway REST API to register: 2 reference devices (`cloudprint-sim-1` domain `manufacturing.print.2d.v1`, `fdm-sim-1` domain `manufacturing.additive.fdm.v1`), 4 policies (default-deny-hazardous, restricted-needs-hitl, budget-alice, allow-poster-agent-print2d), 1 agent principal (`agent://alice/poster-agent`) + bearer token, 1 human principal (`human://bob@fab`) + OIDC stub (2h)
-- [ ] **[P1]** `make seed` target calls `scripts/seed.py`; must be idempotent (safe to run on existing DB) (0.5h)
-- [ ] **[P2]** Add `scripts/test_journey_a.py` stub (discover → returns 200 placeholder) (0.5h)
-- [ ] **[P2]** Add `scripts/test_journey_b.py` stub (placeholder) (0.5h)
-- [ ] **[P2]** Add `make discover` and `make health` targets for quick manual smoke tests (0.5h)
+- [x] **[P1]** Create `scripts/seed.py`: idempotent script that uses the Gateway REST API to register: 2 reference devices (`cloudprint-sim-1` domain `manufacturing.print.2d.v1`, `fdm-sim-1` domain `manufacturing.additive.fdm.v1`), 4 policies (default-deny-hazardous, restricted-needs-hitl, budget-alice, allow-poster-agent-print2d), 1 agent principal (`agent://alice/poster-agent`) + bearer token, 1 human principal (`human://bob@fab`) + OIDC stub (2h)
+- [x] **[P1]** `make seed` target calls `scripts/seed.py`; must be idempotent (safe to run on existing DB) (0.5h)
+- [x] **[P2]** Add `scripts/test_journey_a.py` stub (discover → returns 200 placeholder) (0.5h)
+- [x] **[P2]** Add `scripts/test_journey_b.py` stub (placeholder) (0.5h)
+- [x] **[P2]** Add `make discover` and `make health` targets for quick manual smoke tests (0.5h)
 
 ### Group 05 — Testing (4h)
-- [ ] **[P1]** Verify `make dev-up` starts all services and all healthchecks pass (1h)
-- [ ] **[P1]** Verify `make seed` runs without error on fresh DB and is idempotent on re-run (0.5h)
-- [ ] **[P1]** CI workflow runs on a PR and all jobs pass (1h)
-- [ ] **[P1]** `scripts/validate_schemas.py` validates all 3 example files in `docs/aimp/examples/` (0.5h)
-- [ ] **[P2]** Document `make dev-up → make seed → curl /v1/healthz` smoke test in README.md (1h)
+- [x] **[P1]** Verify `make dev-up` starts all services and all healthchecks pass (1h)
+- [x] **[P1]** Verify `make seed` runs without error on fresh DB and is idempotent on re-run (0.5h)
+- [ ] **[P1]** CI workflow runs on a PR and all jobs pass (1h) ← **BLOCKED: no ci.yml yet**
+- [ ] **[P1]** `scripts/validate_schemas.py` validates all 3 example files in `docs/aimp/examples/` (0.5h) ← **BLOCKED: script missing**
+- [x] **[P2]** Document `make dev-up → make seed → curl /v1/healthz` smoke test in README.md (1h)
 
 ## AI Execution Prompt
 
@@ -101,14 +101,14 @@ Complete Groups 01–05 in order. After each group:
 - `scripts/test_journey_b.py` (stub)
 
 ## Verification Checklist
-- [ ] `make dev-up` succeeds; `docker compose ps` shows all 6 services healthy
-- [ ] `curl http://localhost:8080/healthz` returns 200
-- [ ] `make seed` completes without errors
-- [ ] `make seed` (second run) completes without errors (idempotency)
-- [ ] `make lint-gateway` and `make lint-console` pass on the stubs
-- [ ] GitHub Actions CI workflow triggers on a test PR and all jobs green
-- [ ] `scripts/validate_schemas.py` validates all example files
-- [ ] No `.env` file committed; `.env.example` present
+- [x] `make dev-up` succeeds; `docker compose ps` shows all 6 services healthy
+- [x] `curl http://localhost:8080/healthz` returns 200
+- [x] `make seed` completes without errors
+- [x] `make seed` (second run) completes without errors (idempotency)
+- [x] `make lint-gateway` and `make lint-console` pass on the stubs
+- [ ] GitHub Actions CI workflow triggers on a test PR and all jobs green ← **MISSING: .github/workflows/ci.yml**
+- [ ] `scripts/validate_schemas.py` validates all example files ← **MISSING: scripts/validate_schemas.py**
+- [x] No `.env` file committed; `.env.example` present
 
 ## Notes
 - `make dev-up` must work on Apple Silicon (arm64) — ensure postgres/redis/minio images are multi-arch
