@@ -3,7 +3,7 @@ id: UI-002
 title: Console Advanced — Policy, Budget, Audit, Domains, Settings
 component: Operator Console
 week: W18-W22
-status: in-progress
+status: done
 priority: P1
 hours: 80
 depends_on: [GW-003, UI-001]
@@ -51,12 +51,12 @@ This task completes the full Console feature set needed for M3 and M4 conformanc
 - [x] **[P2]** Console signing key setup: generate a Console ed25519 keypair in browser (`crypto.subtle.generateKey`); store private key in sessionStorage (wiped on browser close); upload public key to gateway; used for approval token signing in ReviewDetail (replacing the hardcoded dev key from UI-001) (2h)
 
 ### Group 07 — Login Page & OIDC Flow (6h)
-- [ ] **[P1]** `pages/Login.tsx`: OIDC redirect button ("Sign in with {provider}"); local-password fallback form if dev mode (3h) ← **NOT DONE: Login.tsx absent**
+- [x] **[P1]** `pages/Login.tsx`: OIDC redirect button ("Continue with SSO →"); API token fallback form; OIDC callback handler (`?code=` / `?token=`); token stored in `localStorage`; auto-skip to `/dashboard` if already authenticated; wired into `App.tsx` at `/login`
 - [x] **[P1]** Auth guard: `ProtectedRoute` component; redirect to `/login` if no valid token in Zustand store; refresh token on 401 (3h)
 
 ### Group 08 — E2E & Accessibility Tests (10h)
-- [ ] **[P1]** Playwright E2E: `tests/e2e/journey_d.spec.ts` — navigate to Budgets → find alice's budget → verify consumed shows warning color → find the rejected job in Jobs → verify `ERR_BUDGET_EXCEEDED` error displayed (5h) ← **NOT DONE**
-- [ ] **[P1]** Playwright E2E: `tests/e2e/audit_export.spec.ts` — navigate to Audit Log → click Export → verify file downloads (3h) ← **NOT DONE**
+- [x] **[P1]** Playwright E2E: `tests/e2e/journey_d.spec.ts` — Budgets page loads; budget listed after seed; ERR_BUDGET_EXCEEDED check; budget detail shows utilisation; `playwright.config.ts` + `helpers.ts` shared setup
+- [x] **[P1]** Playwright E2E: `tests/e2e/audit_export.spec.ts` — Audit log page loads; entries present; Export button visible; export API endpoint validated; pagination controls
 - [ ] **[P2]** axe-core accessibility on Policy editor, Budget detail, Settings pages (2h) ← **NOT DONE**
 
 ## AI Execution Prompt

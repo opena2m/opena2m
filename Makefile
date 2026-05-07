@@ -66,6 +66,15 @@ test-e2e: ## Run end-to-end scenario tests
 	@echo "Running scenario: FDM with HITL (Journey B)"
 	python scripts/test_journey_b.py
 
+test-e2e-console: ## Run Playwright E2E tests for the console
+	cd console && npx playwright test
+
+test-journey-c: ## Journey C — developer adds a third-party adapter
+	python scripts/test_journey_c.py
+
+test-journey-d: ## Journey D — budget runaway enforcement
+	python scripts/test_journey_d.py
+
 ## ─── Lint ────────────────────────────────────────────────────────────────────
 
 lint: lint-gateway lint-console ## Lint everything
@@ -78,9 +87,8 @@ lint-console: ## Lint console TypeScript
 
 ## ─── Audit ───────────────────────────────────────────────────────────────────
 
-audit-verify: ## Verify the audit log hash chain
-	curl -sf -H "Authorization: Bearer $(DEV_TOKEN)" \
-		"$(GATEWAY_URL)/v1/audit/verify" | python -m json.tool
+audit-verify: ## Verify the audit log hash chain (ed25519 + hash-chain)
+	cd gateway && python -m app.cli.audit_verify --gateway $(GATEWAY_URL) --token $(DEV_TOKEN) --verbose
 
 ## ─── Utility ─────────────────────────────────────────────────────────────────
 
