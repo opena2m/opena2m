@@ -24,7 +24,7 @@ VALID_TRANSITIONS: dict[JobState, Set[JobState]] = {
     JobState.QUOTED: {JobState.LOCKED, JobState.ABORTED, JobState.FAILED},
     JobState.LOCKED: {JobState.EXECUTING, JobState.ABORTED, JobState.FAILED},
     JobState.EXECUTING: {JobState.AUDITING, JobState.FULFILLING, JobState.COMPLETED, JobState.ABORTED, JobState.FAILED},
-    JobState.AUDITING: {JobState.EXECUTING, JobState.ABORTED, JobState.FAILED},
+    JobState.AUDITING: {JobState.EXECUTING, JobState.LOCKED, JobState.ABORTED, JobState.FAILED},
     JobState.FULFILLING: {JobState.COMPLETED, JobState.ABORTED, JobState.FAILED},
     JobState.COMPLETED: set(),
     JobState.ABORTED: set(),

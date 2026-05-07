@@ -201,6 +201,35 @@ TOOLS = [
             "required": ["job_id"],
         },
     ),
+    Tool(
+        name="aimp.resume",
+        description=(
+            "Resume a job paused in AUDITING state. "
+            "Provide decision=CONTINUE to approve, ABORT to stop, or ADJUST with "
+            "parameter_overrides to modify parameters before resuming."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "job_id": {"type": "string", "description": "Job ID to resume."},
+                "approval_token": {
+                    "type": "string",
+                    "description": "Token from telemetry human_action_required.approve_url.",
+                },
+                "decision": {
+                    "type": "string",
+                    "enum": ["CONTINUE", "ABORT", "ADJUST"],
+                    "description": "CONTINUE to approve, ABORT to stop, ADJUST to override parameters.",
+                },
+                "parameter_overrides": {
+                    "type": "object",
+                    "description": "Parameter overrides (only valid with ADJUST decision).",
+                },
+                "reviewer_note": {"type": "string", "description": "Optional reviewer annotation."},
+            },
+            "required": ["job_id", "approval_token", "decision"],
+        },
+    ),
 ]
 
 
@@ -371,6 +400,16 @@ async def _dispatch(name: str, args: dict) -> dict:
             "recovery_mode": args.get("recovery_mode", "safe_home"),
         }
         return await _call_gateway("POST", f"/v1/jobs/{job_id}/abort", body)
+
+    elif name == "aimp.resume":
+        body = {
+            "envelope": _make_envelope(job_id),
+            "approval_token": args["approval_token"],
+            "decision": args["decision"],
+            "parameter_overrides": args.get("parameter_overrides"),
+            "reviewer_note": args.get("reviewer_note"),
+        }
+        return await _call_gateway("POST", f"/v1/jobs/{job_id}/resume", body)
 
     else:
         raise ValueError(f"Unknown tool: {name}")

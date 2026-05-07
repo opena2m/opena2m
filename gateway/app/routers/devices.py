@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import Principal, get_current_principal
 from app.core.database import get_db
+from app.core.errors import aimp_error
 from app.models.orm import Device, DeviceDomain
 
 router = APIRouter()
@@ -59,7 +60,7 @@ async def get_device(
     principal.require("aimp:devices:read")
     device = await db.get(Device, device_id)
     if device is None:
-        raise HTTPException(status_code=404, detail="Device not found.")
+        raise aimp_error("ERR_DEVICE_NOT_FOUND", "Device not found.", "resource", status=404)
     dds = (await db.execute(select(DeviceDomain).where(DeviceDomain.device_id == device_id))).scalars().all()
     return {
         "device_id": device.device_id,
@@ -86,7 +87,7 @@ async def create_device(
     principal.require("aimp:devices:write")
     existing = await db.get(Device, body.device_id)
     if existing:
-        raise HTTPException(status_code=409, detail="Device already exists.")
+        raise aimp_error("ERR_INVALID_PAYLOAD", "Device already exists.", "validation", status=409)
     device = Device(
         device_id=body.device_id,
         display_name=body.display_name,
@@ -116,7 +117,7 @@ async def disable_device(
     from datetime import datetime, timezone
     device = await db.get(Device, device_id)
     if device is None:
-        raise HTTPException(status_code=404, detail="Device not found.")
+        raise aimp_error("ERR_DEVICE_NOT_FOUND", "Device not found.", "resource", status=404)
     device.disabled_at = datetime.now(timezone.utc)
     return {"device_id": device_id, "disabled": True}
 

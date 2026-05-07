@@ -123,7 +123,8 @@ class TestPoliciesEndpoint:
         body = r.json()
         assert body["action"] in ("allow", "deny", "require_hitl", "require_approval")
 
-    async def test_dry_run_hazardous_denied(self, client):
+    async def test_dry_run_hazardous_requires_approval(self, client):
+        """Per AIMP §04 H5: hazardous tier triggers require_approval, not deny."""
         r = await client.post("/v1/policies/dry-run", json={
             "domain": "chemistry.reactor.v1",
             "device_id": "reactor-1",
@@ -131,7 +132,7 @@ class TestPoliciesEndpoint:
             "principal_kind": "agent",
         })
         assert r.status_code == 200
-        assert r.json()["action"] == "deny"
+        assert r.json()["action"] == "require_approval"
 
 
 @pytest.mark.asyncio

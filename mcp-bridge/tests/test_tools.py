@@ -62,6 +62,11 @@ MOCK_ABORT_RESPONSE = {
     "final_cost": {"amount": 4.00, "currency": "USD"},
 }
 
+MOCK_RESUME_RESPONSE = {
+    "job_id": "job-test-001",
+    "state": "LOCKED",
+}
+
 MOCK_ERR_BUDGET_EXCEEDED = {
     "error": {
         "code": "ERR_BUDGET_EXCEEDED",
@@ -293,13 +298,55 @@ class TestAimpAbort:
         assert body.get("recovery_mode") == "hard_stop"
 
 
-class TestToolList:
+class TestAimpResume:
     @pytest.mark.asyncio
-    async def test_list_tools_returns_five_tools(self):
+    async def test_resume_calls_post_v1_jobs_resume(self):
         import server
-        assert len(server.TOOLS) == 5
+        mock_client = _make_mock_client(200, MOCK_RESUME_RESPONSE)
+        with patch("server.httpx.AsyncClient", return_value=mock_client):
+            result = await server._dispatch("aimp.resume", {
+                "job_id": "job-test-001",
+                "approval_token": "tok-abc",
+                "decision": "CONTINUE",
+            })
+        call_args = mock_client.post.call_args
+        assert "/v1/jobs/job-test-001/resume" in call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_resume_passes_decision(self):
+        import server
+        mock_client = _make_mock_client(200, MOCK_RESUME_RESPONSE)
+        with patch("server.httpx.AsyncClient", return_value=mock_client):
+            await server._dispatch("aimp.resume", {
+                "job_id": "job-test-001",
+                "approval_token": "tok-abc",
+                "decision": "ABORT",
+            })
+        body = mock_client.post.call_args.kwargs.get("json", {})
+        assert body.get("decision") == "ABORT"
+
+    @pytest.mark.asyncio
+    async def test_resume_passes_parameter_overrides(self):
+        import server
+        mock_client = _make_mock_client(200, MOCK_RESUME_RESPONSE)
+        overrides = {"speed_mm_s": 40}
+        with patch("server.httpx.AsyncClient", return_value=mock_client):
+            await server._dispatch("aimp.resume", {
+                "job_id": "job-test-001",
+                "approval_token": "tok-abc",
+                "decision": "ADJUST",
+                "parameter_overrides": overrides,
+            })
+        body = mock_client.post.call_args.kwargs.get("json", {})
+        assert body.get("parameter_overrides") == overrides
+
+
+class TestToolList:
+    def test_list_tools_returns_six_tools(self):
+        import server
+        assert len(server.TOOLS) == 6, f"Expected 6 tools, got {len(server.TOOLS)}: {[t.name for t in server.TOOLS]}"
         tool_names = {t.name for t in server.TOOLS}
-        expected = {"aimp.discover", "aimp.quote", "aimp.execute", "aimp.telemetry", "aimp.abort"}
+        expected = {"aimp.discover", "aimp.quote", "aimp.execute", "aimp.telemetry", "aimp.abort", "aimp.resume"}
         assert tool_names == expected
 
     def test_all_tools_have_input_schema(self):
@@ -313,3 +360,17 @@ class TestToolList:
         for tool in server.TOOLS:
             props = tool.inputSchema.get("properties", {})
             assert "job_id" in props, f"{tool.name} missing job_id parameter"
+
+    def test_resume_tool_has_required_fields(self):
+        import server
+        resume_tool = next(t for t in server.TOOLS if t.name == "aimp.resume")
+        schema = resume_tool.inputSchema
+        required = schema.get("required", [])
+        assert "job_id" in required
+        assert "approval_token" in required
+        assert "decision" in required
+        props = schema.get("properties", {})
+        decision_enum = props.get("decision", {}).get("enum", [])
+        assert "CONTINUE" in decision_enum
+        assert "ABORT" in decision_enum
+        assert "ADJUST" in decision_enum

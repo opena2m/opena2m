@@ -154,7 +154,8 @@ class TestPolicyEngine:
         assert verdict.action == "require_hitl"
 
     @pytest.mark.asyncio
-    async def test_hazardous_denied(self):
+    async def test_hazardous_requires_approval(self):
+        """Per AIMP §04 H5: hazardous tier triggers require_approval, not deny."""
         from unittest.mock import AsyncMock, MagicMock
         from app.services.policy_engine import PolicyEngine, PolicyContext
         db = AsyncMock()
@@ -170,7 +171,7 @@ class TestPolicyEngine:
             budget_limit=500.0,
         )
         verdict = await PolicyEngine.evaluate(db, ctx)
-        assert verdict.action == "deny"
+        assert verdict.action == "require_approval"
 
 
 # ─── Approval token tests ─────────────────────────────────────────────────────

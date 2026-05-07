@@ -1,9 +1,9 @@
 """Pydantic v2 schemas for AIMP protocol request/response envelopes."""
 from __future__ import annotations
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ─── Common envelope ──────────────────────────────────────────────────────────
@@ -20,6 +20,13 @@ class RequestEnvelope(BaseModel):
     timestamp: Optional[datetime] = None
     idempotency_key: Optional[str] = None
     metadata: Optional[RequestMetadata] = None
+
+    @field_validator("aimp_version")
+    @classmethod
+    def validate_version(cls, v: str) -> str:
+        if v not in ("1.0", "1"):
+            raise ValueError(f"Unsupported AIMP version: {v}")
+        return v
 
 
 class AssetRef(BaseModel):
@@ -154,6 +161,7 @@ class SensorReading(BaseModel):
     value: Any
     unit: Optional[str] = None
     at: datetime
+    quality: Literal["ok", "degraded", "stale", "error"] = "ok"
 
 
 class MediaRef(BaseModel):
@@ -166,10 +174,12 @@ class MediaRef(BaseModel):
 
 class VisionCheckResult(BaseModel):
     check_name: str
-    passed: bool
+    verdict: Literal["pass", "warn", "failure", "inconclusive"] = "inconclusive"
     confidence: Optional[float] = None
     detail: Optional[str] = None
     at: datetime
+    recommended_action: Optional[Literal["CONTINUE", "PAUSE", "ABORT"]] = None
+    evidence_media: List[str] = []
 
 
 class HumanActionRequired(BaseModel):
@@ -179,6 +189,8 @@ class HumanActionRequired(BaseModel):
     checkpoint: Optional[str] = None
     deadline: Optional[datetime] = None
     approve_url: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    fallback_action: Literal["ABORT", "HOLD"] = "ABORT"
 
 
 class TelemetryResponse(BaseModel):
@@ -194,6 +206,7 @@ class TelemetryResponse(BaseModel):
     human_action_required: Optional[HumanActionRequired] = None
     error_code: Optional[str] = None
     error_message: Optional[str] = None
+    trace_id: Optional[str] = None
 
 
 # ─── Abort ────────────────────────────────────────────────────────────────────
@@ -222,8 +235,9 @@ class AbortResponse(BaseModel):
 class ResumeRequest(BaseModel):
     envelope: RequestEnvelope
     approval_token: str
-    decision: str = "approve"  # approve | reject
+    decision: Literal["CONTINUE", "ABORT", "ADJUST"] = "CONTINUE"
     reviewer_note: Optional[str] = None
+    parameter_overrides: Optional[Dict[str, Any]] = None
 
 
 class ResumeResponse(BaseModel):

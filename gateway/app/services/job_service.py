@@ -1,5 +1,6 @@
 """Job service — state machine transitions, audit writing, telemetry."""
 from __future__ import annotations
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -58,6 +59,7 @@ class JobService:
         principal_id: Optional[str] = None,
         reason: Optional[str] = None,
     ) -> Job:
+        from app.services.webhook_dispatcher import WebhookDispatcher
         from_state = JobState(job.state)
         validate_transition(from_state, to_state)
         old_state = job.state
@@ -68,14 +70,68 @@ class JobService:
         await db.flush()
         await JobService._record_transition(db, job, from_state, to_state, principal_id, reason)
         # Publish state change to Redis
+        now_iso = datetime.now(timezone.utc).isoformat()
         await redis_client.publish(f"job:{job.job_id}:events", {
             "event": "state_transition",
             "job_id": job.job_id,
             "from": old_state,
             "to": to_state.value,
-            "at": datetime.now(timezone.utc).isoformat(),
+            "at": now_iso,
         })
+        # Enqueue webhook for state_transition (C4)
+        webhook_payload = {
+            "event": "state_transition",
+            "aimp_version": "1.0",
+            "job_id": job.job_id,
+            "from": old_state,
+            "to": to_state.value,
+            "at": now_iso,
+            "principal_id": principal_id,
+            "telemetry_summary": {"progress": job.progress},
+            "trace_id": (job.metadata_json or {}).get("trace_id"),
+        }
+        dispatcher = WebhookDispatcher()
+        asyncio.create_task(
+            dispatcher.enqueue(db, job.job_id, "state_transition", webhook_payload)
+        )
+        # Budget settle on COMPLETED (H4)
+        if to_state == JobState.COMPLETED and job.principal_id:
+            asyncio.create_task(
+                JobService._settle_budget(job.job_id, job.principal_id)
+            )
         return job
+
+    @staticmethod
+    async def _settle_budget(job_id: str, principal_id: str) -> None:
+        """Settle budget reservation when job completes."""
+        try:
+            from app.core.database import AsyncSessionLocal
+            from app.services.budget_service import BudgetService
+            from app.models.orm import Quote
+            from sqlalchemy import select
+            async with AsyncSessionLocal() as db:
+                job = await JobService.get_by_id(db, job_id)
+                if job is None:
+                    return
+                used_quote = (
+                    await db.execute(
+                        select(Quote).where(
+                            Quote.job_id == job_id,
+                            Quote.used_at.isnot(None),
+                        )
+                    )
+                ).scalar_one_or_none()
+                if used_quote:
+                    cost = used_quote.estimated_cost_json
+                    await BudgetService.settle(
+                        db,
+                        principal_id=principal_id,
+                        amount=cost.get("amount", 0),
+                        currency=cost.get("currency", "USD"),
+                    )
+                await db.commit()
+        except Exception as exc:
+            logger.warning("Budget settle error for job %s: %s", job_id, exc)
 
     @staticmethod
     async def _record_transition(

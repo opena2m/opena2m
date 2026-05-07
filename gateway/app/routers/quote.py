@@ -2,6 +2,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
+import jsonschema
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import Principal, get_current_principal
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.errors import aimp_error
 from app.core.state_machine import JobState
 from app.models.orm import Device, DeviceDomain, Quote
 from app.models.schemas import (
@@ -45,9 +47,9 @@ async def quote(
     # Validate device
     device = await db.get(Device, body.device_id)
     if device is None:
-        raise HTTPException(status_code=404, detail=f"Device '{body.device_id}' not found.")
+        raise aimp_error("ERR_DEVICE_NOT_FOUND", f"Device '{body.device_id}' not found.", "resource", status=404)
     if device.disabled_at is not None:
-        raise HTTPException(status_code=409, detail="Device is disabled.")
+        raise aimp_error("ERR_INVALID_PAYLOAD", "Device is disabled.", "validation", status=409)
 
     # Validate domain
     dd = (
@@ -59,15 +61,37 @@ async def quote(
         )
     ).scalar_one_or_none()
     if dd is None:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Device '{body.device_id}' does not support domain '{body.domain}'."
+        raise aimp_error(
+            "ERR_INVALID_PAYLOAD",
+            f"Device '{body.device_id}' does not support domain '{body.domain}'.",
+            "validation",
+            status=422,
         )
 
     # Get adapter and compute quote
     adapter = adapter_registry.get(body.domain)
     if adapter is None:
-        raise HTTPException(status_code=501, detail=f"No adapter registered for domain '{body.domain}'.")
+        raise aimp_error(
+            "ERR_INVALID_PAYLOAD",
+            f"No adapter registered for domain '{body.domain}'.",
+            "validation",
+            status=501,
+        )
+
+    # Domain schema validation (C3)
+    schema = adapter_registry.get_schema(body.domain)
+    if schema and body.payload:
+        try:
+            jsonschema.validate(body.payload, schema)
+        except jsonschema.ValidationError as exc:
+            raise aimp_error(
+                "ERR_INVALID_PAYLOAD",
+                exc.message,
+                "validation",
+                retryable=False,
+                status=422,
+                details={"path": list(exc.absolute_path)},
+            )
 
     try:
         quote_result = await adapter.compute_quote(
@@ -78,7 +102,7 @@ async def quote(
         )
     except Exception as exc:
         logger.exception("Adapter quote error: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Adapter error: {exc}")
+        raise aimp_error("ERR_INVALID_PAYLOAD", f"Adapter error: {exc}", "internal", status=500)
 
     # Policy evaluation
     ctx = PolicyContext(
@@ -93,7 +117,7 @@ async def quote(
     )
     verdict = await PolicyEngine.evaluate(db, ctx)
     if verdict.action == "deny":
-        raise HTTPException(status_code=403, detail=f"Policy denied: {verdict.reason}")
+        raise aimp_error("ERR_RISK_TIER_BLOCKED", f"Policy denied: {verdict.reason}", "policy", status=403)
 
     # Budget check
     exceeds = False
