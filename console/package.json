@@ -35,6 +35,7 @@
     "@typescript-eslint/eslint-plugin": "^7.13.0",
     "@typescript-eslint/parser": "^7.13.0",
     "@playwright/test": "^1.44.1",
+    "@axe-core/playwright": "^4.9.1",
     "node-fetch": "^3.3.2"
   }
 }

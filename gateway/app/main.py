@@ -13,7 +13,7 @@ from app.core.database import engine, Base
 from app.core.redis_client import redis_client
 from app.core.audit import AuditLog
 from app.core.tracing import RequestIdMiddleware, setup_tracing
-from app.routers import discover, quote, execute, telemetry, abort, resume, jobs, devices, domains, policies, budgets, webhooks, audit as audit_router, metrics as metrics_router, users as users_router, signing_keys as signing_keys_router
+from app.routers import discover, quote, execute, telemetry, abort, resume, jobs, devices, domains, policies, budgets, webhooks, audit as audit_router, metrics as metrics_router, users as users_router, signing_keys as signing_keys_router, auth as auth_router
 from app.services.adapter_registry import adapter_registry
 from app.services.webhook_dispatcher import WebhookDispatcher
 
@@ -83,6 +83,7 @@ app.include_router(audit_router.router, prefix="/v1", tags=["Audit"])
 app.include_router(metrics_router.router, tags=["Observability"])
 app.include_router(users_router.router, prefix="/v1", tags=["Users"])
 app.include_router(signing_keys_router.router, prefix="/v1", tags=["Keys"])
+app.include_router(auth_router.router, prefix="/v1", tags=["Auth"])
 
 
 @app.get("/health")

@@ -16,11 +16,18 @@ import httpx
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import (
+    AnyUrl,
     CallToolRequest,
     CallToolResult,
+    ListResourcesRequest,
+    ListResourcesResult,
     ListToolsRequest,
     ListToolsResult,
+    ReadResourceRequest,
+    ReadResourceResult,
+    Resource,
     TextContent,
+    TextResourceContents,
     Tool,
 )
 
@@ -200,6 +207,96 @@ TOOLS = [
 @server.list_tools()
 async def list_tools(request: ListToolsRequest) -> ListToolsResult:
     return ListToolsResult(tools=TOOLS)
+
+
+# ─── Resources ────────────────────────────────────────────────────────────────
+
+@server.list_resources()
+async def list_resources(request: ListResourcesRequest) -> ListResourcesResult:
+    """
+    List AIMP resources exposed through the MCP bridge.
+
+    Currently exposes every registered device as a resource at
+    ``aimp://device/{device_id}/state`` so agents can read device state
+    without consuming a tool call.
+    """
+    try:
+        body = {
+            "envelope": _make_envelope(),
+            "device_filter": {},
+        }
+        result = await _call_gateway("POST", "/v1/discover", body)
+        devices = result.get("devices", [])
+    except Exception:
+        devices = []
+
+    resources = [
+        Resource(
+            uri=AnyUrl(f"aimp://device/{d['device_id']}/state"),
+            name=f"Device: {d.get('display_name', d['device_id'])}",
+            description=(
+                f"Current state of device {d['device_id']} "
+                f"(domain: {d.get('domain', 'unknown')}, state: {d.get('state', 'UNKNOWN')})"
+            ),
+            mimeType="application/json",
+        )
+        for d in devices
+    ]
+
+    # Always include a static gateway-info resource
+    resources.insert(
+        0,
+        Resource(
+            uri=AnyUrl("aimp://gateway/info"),
+            name="Gateway Info",
+            description="AIMP gateway capabilities and registered domains.",
+            mimeType="application/json",
+        ),
+    )
+
+    return ListResourcesResult(resources=resources)
+
+
+@server.read_resource()
+async def read_resource(request: ReadResourceRequest) -> ReadResourceResult:
+    """
+    Read an AIMP resource by URI.
+
+    Supported URIs:
+      aimp://gateway/info              → GET /capabilities
+      aimp://device/{device_id}/state  → GET /v1/devices/{device_id}
+    """
+    uri = str(request.params.uri)
+
+    try:
+        if uri == "aimp://gateway/info":
+            data = await _call_gateway("GET", "/capabilities")
+        elif uri.startswith("aimp://device/") and uri.endswith("/state"):
+            # aimp://device/{device_id}/state
+            parts = uri.split("/")
+            # parts: ['aimp:', '', 'device', '{device_id}', 'state']
+            if len(parts) >= 5:
+                device_id = parts[3]
+                data = await _call_gateway("GET", f"/v1/devices/{device_id}")
+            else:
+                raise ValueError(f"Malformed device URI: {uri}")
+        else:
+            raise ValueError(f"Unknown resource URI: {uri}")
+
+        return ReadResourceResult(
+            contents=[
+                TextResourceContents(
+                    uri=request.params.uri,
+                    mimeType="application/json",
+                    text=json.dumps(data, indent=2, default=str),
+                )
+            ]
+        )
+
+    except httpx.HTTPStatusError as exc:
+        raise ValueError(f"Gateway HTTP {exc.response.status_code}: {exc.response.text}")
+    except Exception as exc:
+        raise ValueError(f"Resource read failed: {exc}")
 
 
 @server.call_tool()
