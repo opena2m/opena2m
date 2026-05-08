@@ -1,9 +1,10 @@
 """OpenA2M Gateway — FastAPI application entry point."""
 from contextlib import asynccontextmanager
+import asyncio
 import logging
 import os
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -13,8 +14,10 @@ from app.core.database import engine, Base
 from app.core.redis_client import redis_client
 from app.core.audit import AuditLog
 from app.core.tracing import RequestIdMiddleware, setup_tracing
-from app.routers import discover, quote, execute, telemetry, abort, resume, jobs, devices, domains, policies, budgets, webhooks, audit as audit_router, metrics as metrics_router, users as users_router, signing_keys as signing_keys_router
+from app.core.rate_limiter import RateLimiterMiddleware
+from app.routers import discover, quote, execute, telemetry, abort, resume, jobs, devices, domains, policies, budgets, webhooks, audit as audit_router, metrics as metrics_router, users as users_router, signing_keys as signing_keys_router, auth as auth_router, tools as tools_router
 from app.services.adapter_registry import adapter_registry
+from app.services.budget_service import BudgetService
 from app.services.webhook_dispatcher import WebhookDispatcher
 
 logger = logging.getLogger("aimp.gateway")
@@ -36,6 +39,8 @@ async def lifespan(app: FastAPI):
     # Start webhook dispatcher background task
     app.state.webhook_dispatcher = WebhookDispatcher()
     await app.state.webhook_dispatcher.start()
+    # Budget period reset loop
+    asyncio.create_task(_budget_reset_loop())
     logger.info("Gateway ready.")
     yield
     # Shutdown
@@ -56,6 +61,9 @@ app = FastAPI(
 # Tracing & request ID
 app.add_middleware(RequestIdMiddleware)
 setup_tracing(app)
+
+# Rate limiter
+app.add_middleware(RateLimiterMiddleware)
 
 # CORS
 app.add_middleware(
@@ -83,6 +91,8 @@ app.include_router(audit_router.router, prefix="/v1", tags=["Audit"])
 app.include_router(metrics_router.router, tags=["Observability"])
 app.include_router(users_router.router, prefix="/v1", tags=["Users"])
 app.include_router(signing_keys_router.router, prefix="/v1", tags=["Keys"])
+app.include_router(auth_router.router, prefix="/v1", tags=["Auth"])
+app.include_router(tools_router.router, prefix="/v1", tags=["Integration"])
 
 
 @app.get("/health")
@@ -105,13 +115,55 @@ async def capabilities():
     }
 
 
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Wrap any plain-string HTTPException detail into the AIMP spec error envelope."""
+    detail = exc.detail
+    if isinstance(detail, dict) and "code" in detail:
+        # Already wrapped by aimp_error()
+        content = {"error": detail}
+    else:
+        # Legacy raise or third-party raise — wrap it
+        content = {
+            "error": {
+                "code": "ERR_UNKNOWN",
+                "message": str(detail) if detail else "An error occurred.",
+                "category": "internal",
+                "retryable": False,
+                "details": {},
+            }
+        }
+    return JSONResponse(status_code=exc.status_code, content=content)
+
+
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
     logger.exception("Unhandled exception: %s", exc)
     return JSONResponse(
         status_code=500,
-        content={"error": "INTERNAL_ERROR", "message": "An unexpected error occurred."},
+        content={
+            "error": {
+                "code": "ERR_INTERNAL",
+                "message": "An unexpected error occurred.",
+                "category": "internal",
+                "retryable": False,
+                "details": {},
+            }
+        },
     )
+
+
+async def _budget_reset_loop() -> None:
+    """Hourly background task: reset expired budget windows."""
+    while True:
+        await asyncio.sleep(3600)
+        try:
+            from app.core.database import AsyncSessionLocal
+            async with AsyncSessionLocal() as db:
+                await BudgetService.reset_expired_windows(db)
+                await db.commit()
+        except Exception as exc:
+            logger.warning("Budget reset loop error: %s", exc)
 
 
 if __name__ == "__main__":

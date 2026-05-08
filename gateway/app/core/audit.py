@@ -108,5 +108,7 @@ class AuditLog:
                 "expected_hash": expected_hash,
                 "actual_hash": entry_hash,
             })
-            prev_hash = entry_hash
+            # Use expected_hash for chain continuation so downstream entries
+            # are marked invalid when an upstream entry is tampered (chain propagation)
+            prev_hash = expected_hash
         return results

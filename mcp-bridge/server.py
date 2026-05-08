@@ -16,11 +16,18 @@ import httpx
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import (
+    AnyUrl,
     CallToolRequest,
     CallToolResult,
+    ListResourcesRequest,
+    ListResourcesResult,
     ListToolsRequest,
     ListToolsResult,
+    ReadResourceRequest,
+    ReadResourceResult,
+    Resource,
     TextContent,
+    TextResourceContents,
     Tool,
 )
 
@@ -194,12 +201,131 @@ TOOLS = [
             "required": ["job_id"],
         },
     ),
+    Tool(
+        name="aimp.resume",
+        description=(
+            "Resume a job paused in AUDITING state. "
+            "Provide decision=CONTINUE to approve, ABORT to stop, or ADJUST with "
+            "parameter_overrides to modify parameters before resuming."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "job_id": {"type": "string", "description": "Job ID to resume."},
+                "approval_token": {
+                    "type": "string",
+                    "description": "Token from telemetry human_action_required.approve_url.",
+                },
+                "decision": {
+                    "type": "string",
+                    "enum": ["CONTINUE", "ABORT", "ADJUST"],
+                    "description": "CONTINUE to approve, ABORT to stop, ADJUST to override parameters.",
+                },
+                "parameter_overrides": {
+                    "type": "object",
+                    "description": "Parameter overrides (only valid with ADJUST decision).",
+                },
+                "reviewer_note": {"type": "string", "description": "Optional reviewer annotation."},
+            },
+            "required": ["job_id", "approval_token", "decision"],
+        },
+    ),
 ]
 
 
 @server.list_tools()
 async def list_tools(request: ListToolsRequest) -> ListToolsResult:
     return ListToolsResult(tools=TOOLS)
+
+
+# ─── Resources ────────────────────────────────────────────────────────────────
+
+@server.list_resources()
+async def list_resources(request: ListResourcesRequest) -> ListResourcesResult:
+    """
+    List AIMP resources exposed through the MCP bridge.
+
+    Currently exposes every registered device as a resource at
+    ``aimp://device/{device_id}/state`` so agents can read device state
+    without consuming a tool call.
+    """
+    try:
+        body = {
+            "envelope": _make_envelope(),
+            "device_filter": {},
+        }
+        result = await _call_gateway("POST", "/v1/discover", body)
+        devices = result.get("devices", [])
+    except Exception:
+        devices = []
+
+    resources = [
+        Resource(
+            uri=AnyUrl(f"aimp://device/{d['device_id']}/state"),
+            name=f"Device: {d.get('display_name', d['device_id'])}",
+            description=(
+                f"Current state of device {d['device_id']} "
+                f"(domain: {d.get('domain', 'unknown')}, state: {d.get('state', 'UNKNOWN')})"
+            ),
+            mimeType="application/json",
+        )
+        for d in devices
+    ]
+
+    # Always include a static gateway-info resource
+    resources.insert(
+        0,
+        Resource(
+            uri=AnyUrl("aimp://gateway/info"),
+            name="Gateway Info",
+            description="AIMP gateway capabilities and registered domains.",
+            mimeType="application/json",
+        ),
+    )
+
+    return ListResourcesResult(resources=resources)
+
+
+@server.read_resource()
+async def read_resource(request: ReadResourceRequest) -> ReadResourceResult:
+    """
+    Read an AIMP resource by URI.
+
+    Supported URIs:
+      aimp://gateway/info              → GET /capabilities
+      aimp://device/{device_id}/state  → GET /v1/devices/{device_id}
+    """
+    uri = str(request.params.uri)
+
+    try:
+        if uri == "aimp://gateway/info":
+            data = await _call_gateway("GET", "/capabilities")
+        elif uri.startswith("aimp://device/") and uri.endswith("/state"):
+            # aimp://device/{device_id}/state
+            parts = uri.split("/")
+            # parts: ['aimp:', '', 'device', '{device_id}', 'state']
+            if len(parts) >= 5:
+                device_id = parts[3]
+                data = await _call_gateway("GET", f"/v1/devices/{device_id}")
+            else:
+                raise ValueError(f"Malformed device URI: {uri}")
+        else:
+            raise ValueError(f"Unknown resource URI: {uri}")
+
+        return ReadResourceResult(
+            contents=[
+                TextResourceContents(
+                    uri=request.params.uri,
+                    mimeType="application/json",
+                    text=json.dumps(data, indent=2, default=str),
+                )
+            ]
+        )
+
+    except httpx.HTTPStatusError as exc:
+        raise ValueError(f"Gateway HTTP {exc.response.status_code}: {exc.response.text}")
+    except Exception as exc:
+        raise ValueError(f"Resource read failed: {exc}")
 
 
 @server.call_tool()
@@ -274,6 +400,16 @@ async def _dispatch(name: str, args: dict) -> dict:
             "recovery_mode": args.get("recovery_mode", "safe_home"),
         }
         return await _call_gateway("POST", f"/v1/jobs/{job_id}/abort", body)
+
+    elif name == "aimp.resume":
+        body = {
+            "envelope": _make_envelope(job_id),
+            "approval_token": args["approval_token"],
+            "decision": args["decision"],
+            "parameter_overrides": args.get("parameter_overrides"),
+            "reviewer_note": args.get("reviewer_note"),
+        }
+        return await _call_gateway("POST", f"/v1/jobs/{job_id}/resume", body)
 
     else:
         raise ValueError(f"Unknown tool: {name}")

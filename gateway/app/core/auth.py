@@ -10,6 +10,7 @@ from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
+from app.core.errors import err_unauthenticated, err_token_expired, err_token_invalid, err_forbidden_scope
 
 logger = logging.getLogger("aimp.auth")
 
@@ -36,10 +37,7 @@ class Principal:
 
     def require(self, scope: str) -> None:
         if not self.can(scope):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient scope: required '{scope}'",
-            )
+            raise err_forbidden_scope(scope)
 
 
 DEV_PRINCIPAL = Principal(
@@ -55,7 +53,7 @@ async def get_current_principal(
     credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
 ) -> Principal:
     if credentials is None:
-        raise HTTPException(status_code=401, detail="Authorization header required.")
+        raise err_unauthenticated()
 
     token = credentials.credentials
 
@@ -78,9 +76,9 @@ async def get_current_principal(
             token_id=payload.get("jti"),
         )
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired.")
+        raise err_token_expired()
     except jwt.PyJWTError as exc:
-        raise HTTPException(status_code=401, detail=f"Invalid token: {exc}")
+        raise err_token_invalid(f"Invalid token: {exc}")
 
 
 def create_access_token(

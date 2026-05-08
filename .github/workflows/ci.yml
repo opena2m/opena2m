@@ -1,0 +1,397 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
+jobs:
+  # ── Gateway linting ─────────────────────────────────────────────────────────
+  lint-gateway:
+    name: Lint Gateway (ruff + mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: gateway/requirements.txt
+
+      - name: Install gateway deps
+        run: cd gateway && pip install -r requirements.txt
+
+      - name: Run make lint-gateway
+        run: make lint-gateway
+
+  # ── Console linting ─────────────────────────────────────────────────────────
+  lint-console:
+    name: Lint Console (ESLint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: console/package-lock.json
+
+      - name: Install console deps
+        run: cd console && npm ci
+
+      - name: Run make lint-console
+        run: make lint-console
+
+  # ── Gateway unit tests ──────────────────────────────────────────────────────
+  test-gateway:
+    name: Gateway Unit Tests
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      AIMP_DB_URL: "sqlite+aiosqlite:///./test.db"
+      AIMP_REDIS_URL: "redis://localhost:6379"
+      AIMP_DEV_TOKEN: "dev-token"
+      AIMP_JWT_SECRET: "ci-test-secret"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: gateway/requirements.txt
+
+      - name: Install gateway deps
+        run: cd gateway && pip install -r requirements.txt
+
+      - name: Run make test-gateway
+        run: make test-gateway
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-coverage
+          path: gateway/.coverage
+          if-no-files-found: ignore
+
+  # ── Schema validation ────────────────────────────────────────────────────────
+  validate-schemas:
+    name: Validate Schemas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install jsonschema
+        run: pip install jsonschema fastapi pydantic uvicorn sqlalchemy aiosqlite redis cryptography structlog httpx python-jose python-multipart
+
+      - name: Export OpenAPI spec
+        run: cd gateway && python -c "
+import json, sys
+sys.path.insert(0, '.')
+from app.main import app
+spec = app.openapi()
+with open('openapi.json', 'w') as f:
+    json.dump(spec, f, indent=2)
+print(f'Exported {len(spec[\"paths\"])} paths')
+"
+
+      - name: Run validate_schemas.py
+        run: python scripts/validate_schemas.py
+
+  # ── Adapter SDK tests ────────────────────────────────────────────────────────
+  test-adapter-sdk:
+    name: Adapter SDK Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install adapter-sdk deps
+        run: cd adapter-sdk && pip install -e . && pip install pytest pytest-asyncio httpx
+
+      - name: Run adapter-sdk tests
+        run: cd adapter-sdk && python -m pytest tests/ -v --tb=short
+
+  # ── End-to-end tests ─────────────────────────────────────────────────────────
+  test-e2e:
+    name: E2E Tests (Journey A + B)
+    runs-on: ubuntu-latest
+    needs: [test-gateway]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: aimp
+          POSTGRES_USER: aimp
+          POSTGRES_PASSWORD: aimp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aimp"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      AIMP_DB_URL: "postgresql+asyncpg://aimp:aimp@localhost:5432/aimp"
+      AIMP_REDIS_URL: "redis://localhost:6379"
+      AIMP_DEV_TOKEN: "dev-token"
+      AIMP_JWT_SECRET: "ci-e2e-secret"
+      FDM_SIM_SPEED_FACTOR: "50"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: gateway/requirements.txt
+
+      - name: Install deps
+        run: |
+          cd gateway && pip install -r requirements.txt
+          pip install httpx
+
+      - name: Start gateway
+        run: |
+          cd gateway
+          uvicorn app.main:app --host 0.0.0.0 --port 8080 &
+          echo "Waiting for gateway..."
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/healthz && break
+            sleep 1
+          done
+
+      - name: Seed reference data
+        run: python scripts/seed.py
+        env:
+          AIMP_GATEWAY_URL: http://localhost:8080
+
+      - name: Run make test-e2e
+        run: make test-e2e
+        env:
+          AIMP_GATEWAY_URL: http://localhost:8080
+
+  # ── MCP Bridge tests ──────────────────────────────────────────────────────────
+  test-mcp:
+    name: MCP Bridge Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install MCP bridge deps
+        run: cd mcp-bridge && pip install -r requirements.txt && pip install pytest pytest-asyncio
+
+      - name: Run MCP bridge tests
+        run: cd mcp-bridge && python -m pytest tests/ -v --tb=short
+
+  # ── Playwright console E2E ────────────────────────────────────────────────────
+  test-console-e2e:
+    name: Console E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: [test-e2e]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: aimp
+          POSTGRES_USER: aimp
+          POSTGRES_PASSWORD: aimp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aimp"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      AIMP_DB_URL: "postgresql+asyncpg://aimp:aimp@localhost:5432/aimp"
+      AIMP_REDIS_URL: "redis://localhost:6379"
+      AIMP_DEV_TOKEN: "dev-token"
+      AIMP_JWT_SECRET: "ci-e2e-secret"
+      AIMP_GATEWAY_URL: "http://localhost:8080"
+      CONSOLE_URL: "http://localhost:3000"
+      FDM_SIM_SPEED_FACTOR: "50"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: gateway/requirements.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: console/package-lock.json
+
+      - name: Install gateway deps
+        run: cd gateway && pip install -r requirements.txt && pip install httpx
+
+      - name: Install console deps
+        run: cd console && npm ci
+
+      - name: Install Playwright browsers
+        run: cd console && npx playwright install --with-deps chromium
+
+      - name: Start gateway
+        run: |
+          cd gateway
+          uvicorn app.main:app --host 0.0.0.0 --port 8080 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8080/healthz && break; sleep 1; done
+
+      - name: Seed reference data
+        run: python scripts/seed.py
+        env:
+          AIMP_GATEWAY_URL: http://localhost:8080
+
+      - name: Build and start console
+        run: |
+          cd console
+          VITE_GATEWAY_URL=http://localhost:8080 VITE_GATEWAY_TOKEN=dev-token npm run build
+          npm run preview -- --port 3000 &
+          sleep 3
+
+      - name: Run Playwright tests
+        run: cd console && npx playwright test --reporter=github
+        env:
+          AIMP_GATEWAY_URL: http://localhost:8080
+          AIMP_DEV_TOKEN: dev-token
+          CONSOLE_URL: http://localhost:3000
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: console/playwright-report/
+          if-no-files-found: ignore
+
+  # ── Journey C / D integration ─────────────────────────────────────────────────
+  test-journey-cd:
+    name: Journey C & D Integration
+    runs-on: ubuntu-latest
+    needs: [test-e2e]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: aimp
+          POSTGRES_USER: aimp
+          POSTGRES_PASSWORD: aimp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aimp"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      AIMP_DB_URL: "postgresql+asyncpg://aimp:aimp@localhost:5432/aimp"
+      AIMP_REDIS_URL: "redis://localhost:6379"
+      AIMP_DEV_TOKEN: "dev-token"
+      AIMP_ALICE_TOKEN: "alice-agent-token"
+      AIMP_JWT_SECRET: "ci-e2e-secret"
+      AIMP_GATEWAY_URL: "http://localhost:8080"
+      FDM_SIM_SPEED_FACTOR: "50"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: gateway/requirements.txt
+
+      - name: Install deps
+        run: |
+          cd gateway && pip install -r requirements.txt
+          cd adapter-sdk && pip install -e .
+          pip install httpx
+
+      - name: Start gateway
+        run: |
+          cd gateway
+          uvicorn app.main:app --host 0.0.0.0 --port 8080 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8080/healthz && break; sleep 1; done
+
+      - name: Seed reference data
+        run: python scripts/seed.py
+        env:
+          AIMP_GATEWAY_URL: http://localhost:8080
+
+      - name: Journey C — adapter plugin
+        run: python scripts/test_journey_c.py
+
+      - name: Journey D — budget runaway
+        run: python scripts/test_journey_d.py
+        env:
+          AIMP_GATEWAY_URL: http://localhost:8080
+          AIMP_DEV_TOKEN: dev-token
+          AIMP_ALICE_TOKEN: alice-agent-token

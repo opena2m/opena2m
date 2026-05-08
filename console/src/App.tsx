@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import Landing from '@/pages/Landing'
+import Login from '@/pages/Login'
 import Layout from '@/components/layout/Layout'
 import Dashboard from '@/pages/Dashboard'
 import Jobs from '@/pages/Jobs'
@@ -23,9 +24,10 @@ export default function App() {
   return (
     <>
       <Routes>
-        {/* Landing — no sidebar */}
+        {/* Landing & auth — no sidebar */}
         <Route path="/" element={<Landing />} />
         <Route path="/landing" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
 
         {/* All console pages share one Layout instance (sidebar persists) */}
         <Route element={<Layout />}>

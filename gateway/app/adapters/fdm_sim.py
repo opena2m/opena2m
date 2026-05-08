@@ -165,7 +165,10 @@ class FDMSimAdapter(BaseAdapter):
                     f"https://via.placeholder.com/640x480.jpg?text=Layer+{i*5}%25",
                 )
 
-        # EXECUTING → COMPLETED
+        # EXECUTING → FULFILLING → COMPLETED (M1: cooling and post-processing)
+        await self._set_state(job_id, "FULFILLING", "cooling_and_post_processing")
+        logger.info("[fdm-sim] Job %s — FULFILLING: cooling down", job_id)
+        await asyncio.sleep(0.5)
         await self._set_state(job_id, "COMPLETED", "print_success")
         logger.info("[fdm-sim] Job %s COMPLETED successfully.", job_id)
 

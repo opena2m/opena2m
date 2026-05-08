@@ -115,7 +115,7 @@ class BaseAdapter(ABC):
         from datetime import datetime, timedelta, timezone
         from app.core.database import AsyncSessionLocal
         from app.services.job_service import JobService
-        expires = datetime.now(timezone.utc) + timedelta(hours=24)
+        expires = datetime.now(timezone.utc) + timedelta(hours=1)
         async with AsyncSessionLocal() as db:
             await JobService.add_telemetry(
                 db, job_id, channel, "media",
@@ -126,13 +126,28 @@ class BaseAdapter(ABC):
             await db.commit()
 
     async def _add_vision_check(
-        self, job_id: str, check_name: str, passed: bool, confidence: float = 1.0, detail: str = ""
+        self,
+        job_id: str,
+        check_name: str,
+        passed: bool,
+        confidence: float = 1.0,
+        detail: str = "",
+        evidence_media: list = None,
     ) -> None:
+        """Store a vision check result.  `passed=True` maps to verdict='pass', False→'failure'."""
         from app.core.database import AsyncSessionLocal
         from app.services.job_service import JobService
+        verdict = "pass" if passed else "failure"
+        recommended_action = "CONTINUE" if passed else "ABORT"
         async with AsyncSessionLocal() as db:
             await JobService.add_telemetry(
                 db, job_id, check_name, "vision_check",
-                value_json={"passed": passed, "confidence": confidence, "detail": detail}
+                value_json={
+                    "verdict": verdict,
+                    "confidence": confidence,
+                    "detail": detail,
+                    "recommended_action": recommended_action,
+                    "evidence_media": evidence_media or [],
+                }
             )
             await db.commit()

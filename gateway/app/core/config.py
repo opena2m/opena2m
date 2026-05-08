@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     AIMP_OIDC_ISSUER: str = ""
     AIMP_OIDC_CLIENT_ID: str = ""
     AIMP_OIDC_CLIENT_SECRET: str = ""
+    AIMP_OIDC_SCOPES: str = "openid profile email"  # space-separated
 
     # Audit signing
     AIMP_AUDIT_PRIVATE_KEY_PATH: str = "./keys/audit_ed25519.pem"

@@ -2,7 +2,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import Principal, get_current_principal
 from app.core.database import get_db
+from app.core.errors import aimp_error
 from app.core.redis_client import redis_client
 from app.models.orm import Job, TelemetryEvent
 from app.models.schemas import (
@@ -34,7 +35,7 @@ async def get_telemetry(
     principal.require("aimp:telemetry")
     job = await JobService.get_by_id(db, job_id)
     if job is None:
-        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
+        raise aimp_error("ERR_JOB_NOT_FOUND", f"Job '{job_id}' not found.", "resource", status=404)
 
     # Load recent telemetry events
     q = select(TelemetryEvent).where(TelemetryEvent.job_id == job_id).order_by(desc(TelemetryEvent.id)).limit(50)
@@ -70,12 +71,19 @@ async def get_telemetry(
                 ))
         elif ev.kind == "vision_check":
             val = ev.value_json or {}
+            # Support both legacy `passed: bool` (old records) and new `verdict` field
+            if "verdict" in val:
+                verdict = val["verdict"]
+            else:
+                verdict = "pass" if val.get("passed", True) else "failure"
             vision.append(VisionCheckResult(
                 check_name=ev.channel,
-                passed=val.get("passed", True),
+                verdict=verdict,
                 confidence=val.get("confidence"),
                 detail=val.get("detail"),
                 at=ev.at,
+                recommended_action=val.get("recommended_action"),
+                evidence_media=val.get("evidence_media", []),
             ))
 
     # HITL info if auditing
@@ -86,14 +94,18 @@ async def get_telemetry(
         checkpoints = audit_reqs.get("pause_for_human_at", [])
         checkpoint = checkpoints[0] if checkpoints else "manual_review"
         review_token = mint_token(job_id, "human://reviewer", checkpoint)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
         human_action = HumanActionRequired(
             review_id=f"review-{job_id}",
             reason="Human review required before continuing execution.",
             instructions="Review the latest telemetry data and approve or reject.",
             checkpoint=checkpoint,
             approve_url=f"/review/{job_id}?token={review_token}",
+            expires_at=expires_at,
+            fallback_action="ABORT",
         )
 
+    trace_id = (job.metadata_json or {}).get("trace_id")
     return TelemetryResponse(
         job_id=job_id,
         state=job.state,
@@ -107,6 +119,7 @@ async def get_telemetry(
         human_action_required=human_action,
         error_code=job.error_code,
         error_message=job.error_message,
+        trace_id=trace_id,
     )
 
 

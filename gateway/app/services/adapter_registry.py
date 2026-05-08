@@ -101,6 +101,14 @@ class AdapterRegistry:
     def get(self, domain_id: str) -> Optional["BaseAdapter"]:
         return self._adapters.get(domain_id)
 
+    def get_schema(self, domain_id: str) -> Optional[dict]:
+        """Return the JSON Schema for a domain's payload, or None if not found."""
+        meta = _DOMAIN_META.get(domain_id, {})
+        if not meta.get("schema_file"):
+            return None
+        schema = _load_schema(meta["schema_file"])
+        return schema if schema else None
+
     def list_domains(self) -> List[str]:
         return list(self._adapters.keys())
 

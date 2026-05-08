@@ -35,12 +35,13 @@ class PolicyVerdict:
 _BUILTIN_POLICIES = [
     {
         "policy_id": "builtin-deny-hazardous",
-        "name": "Deny hazardous without approval",
+        "name": "Require approval for hazardous tier",
         "priority": 10,
         "enabled": True,
         "rule": {
             "conditions": {"risk_tier": "hazardous"},
-            "action": "deny",
+            "action": "require_approval",
+            "reason": "hazardous_domain_requires_human_approval",
         },
     },
     {

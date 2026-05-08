@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import Principal, get_current_principal
 from app.core.database import get_db
+from app.core.errors import aimp_error
 from app.models.schemas import JobDetail, JobListResponse
 from app.services.job_service import JobService
 
@@ -55,7 +56,7 @@ async def get_job(
     principal.require("aimp:jobs:read")
     job = await JobService.get_by_id(db, job_id)
     if job is None:
-        raise HTTPException(status_code=404, detail="Job not found.")
+        raise aimp_error("ERR_JOB_NOT_FOUND", "Job not found.", "resource", status=404)
     return JobDetail(
         job_id=job.job_id,
         state=job.state,
